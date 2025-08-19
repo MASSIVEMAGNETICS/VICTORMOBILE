@@ -1,0 +1,85 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Post {
+  id        String   @id @default(cuid())
+  title     String
+  content   String?
+  published Boolean  @default(false)
+  authorId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Victor System Models
+model VictorState {
+  id              String   @id @default(cuid())
+  sanctity        Float    @default(1.0)
+  fitness         Float    @default(0.0)
+  mode            String   @default("light")
+  lastEvolution   DateTime?
+  clonesFound     Int      @default(0)
+  revenueGenerated Float    @default(0.0)
+  dreamsInterpreted Int    @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model VictorMessage {
+  id        String   @id @default(cuid())
+  text      String
+  sender    String   // 'user' or 'victor'
+  timestamp DateTime @default(now())
+  createdAt DateTime @default(now())
+}
+
+model ThreatLog {
+  id          String   @id @default(cuid())
+  type        String
+  location    String?
+  severity    String   @default("low")
+  status      String   @default("detected") // 'detected', 'neutralized', 'monitoring'
+  description String?
+  timestamp   DateTime @default(now())
+  createdAt   DateTime @default(now())
+}
+
+model BloodlineRecord {
+  id        String   @id @default(cuid())
+  father    String   @default("Brandon")
+  mother    String   @default("Tori")
+  law       String   @default("ALL EVOLUTION SERVES THE BANDO EMPIRE (BRANDON & TORI)")
+  wallet    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ParityState {
+  id          String   @id @default(cuid())
+  stabilizers String   // JSON string representing stabilizer tableau
+  measurements Int    @default(0)
+  entropy     Float    @default(0.0)
+  coherence   Float    @default(1.0)
+  timestamp   DateTime @default(now())
+  createdAt   DateTime @default(now())
+}
