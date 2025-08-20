@@ -39,128 +39,96 @@ interface Threat {
 }
 
 interface DNASentinelProps {
-  onThreatDetected?: (threat: Threat) => void
-  onThreatNeutralized?: (threatId: number) => void
+  newThreatAlert?: Threat | null;
+  onThreatDetected?: (threat: Threat) => void;
+  onThreatNeutralized?: (threatId: number) => void;
 }
 
-export default function DNASentinel({ onThreatDetected, onThreatNeutralized }: DNASentinelProps) {
-  const [threats, setThreats] = useState<Threat[]>([
-    {
-      id: 1,
-      type: 'Code Clone',
-      severity: 'high',
-      status: 'neutralized',
-      location: 'GitHub Repository',
-      description: 'Unauthorized replication of Victor core algorithms detected',
-      timestamp: new Date(Date.now() - 30 * 60 * 1000),
-      confidence: 94,
-      source: 'GitHub API Monitor'
-    },
-    {
-      id: 2,
-      type: 'Data Breach Attempt',
-      severity: 'medium',
-      status: 'monitoring',
-      location: 'Cloud Storage',
-      description: 'Suspicious access patterns detected in encrypted data stores',
-      timestamp: new Date(Date.now() - 15 * 60 * 1000),
-      confidence: 76,
-      source: 'Cloud Security Monitor'
-    },
-    {
-      id: 3,
-      type: 'API Attack',
-      severity: 'low',
-      status: 'analyzing',
-      location: 'Payment Gateway',
-      description: 'Unusual API call patterns detected',
-      timestamp: new Date(Date.now() - 5 * 60 * 1000),
-      confidence: 62,
-      source: 'API Gateway Monitor'
-    }
-  ])
-
-  const [isScanning, setIsScanning] = useState(true)
-  const [scanProgress, setScanProgress] = useState(0)
-  const [threatLevel, setThreatLevel] = useState(0.35)
-  const [totalThreatsNeutralized, setTotalThreatsNeutralized] = useState(127)
+export default function DNASentinel({ newThreatAlert, onThreatDetected, onThreatNeutralized }: DNASentinelProps) {
+  const [threats, setThreats] = useState<Threat[]>([]);
+  const [isScanning, setIsScanning] = useState(true);
+  const [scanProgress, setScanProgress] = useState(0);
+  const [threatLevel, setThreatLevel] = useState(0.0);
+  const [totalThreatsNeutralized, setTotalThreatsNeutralized] = useState(0);
   const [scanStats, setScanStats] = useState({
     repositoriesScanned: 15420,
     apisMonitored: 89,
     dataSources: 34,
-    lastScan: new Date(Date.now() - 2 * 60 * 1000)
-  })
+    lastScan: new Date(Date.now() - 2 * 60 * 1000),
+  });
 
+  // Fetch initial threats
+  useEffect(() => {
+    const fetchThreats = async () => {
+      try {
+        const response = await fetch('/api/victor/threats');
+        if (response.ok) {
+          const data = await response.json();
+          setThreats(data.map((t: any) => ({...t, timestamp: new Date(t.timestamp)})));
+        }
+      } catch (error) {
+        console.error('Failed to fetch threats', error);
+      }
+    };
+    fetchThreats();
+  }, []);
+
+  // Handle new threat alerts from parent
+  useEffect(() => {
+    if (newThreatAlert && !threats.find(t => t.id === newThreatAlert.id)) {
+      setThreats(prev => [newThreatAlert, ...prev]);
+    }
+  }, [newThreatAlert, threats]);
+
+  // Scanning simulation (can be kept for visual effect)
   useEffect(() => {
     if (isScanning) {
       const scanInterval = setInterval(() => {
-        setScanProgress(prev => {
-          if (prev >= 100) {
-            // Simulate finding new threats occasionally
-            if (Math.random() > 0.8) {
-              const newThreat = generateRandomThreat()
-              setThreats(prev => [newThreat, ...prev])
-              onThreatDetected?.(newThreat)
-            }
-            return 0
-          }
-          return prev + 2
-        })
-      }, 100)
-
-      return () => clearInterval(scanInterval)
+        setScanProgress(prev => (prev >= 100 ? 0 : prev + 2));
+      }, 100);
+      return () => clearInterval(scanInterval);
     }
-  }, [isScanning, onThreatDetected])
+  }, [isScanning]);
 
   useEffect(() => {
     // Update threat level based on active threats
-    const activeThreats = threats.filter(t => t.status !== 'neutralized')
+    const activeThreats = threats.filter(t => t.status !== 'neutralized');
     const newThreatLevel = activeThreats.reduce((sum, threat) => {
       const severityMultiplier = {
         low: 0.1,
         medium: 0.3,
         high: 0.6,
-        critical: 1.0
+        critical: 1.0,
+      };
+      return sum + (severityMultiplier[threat.severity] * (threat.confidence || 80) / 100);
+    }, 0);
+    
+    setThreatLevel(Math.min(1, newThreatLevel));
+    setTotalThreatsNeutralized(threats.length - activeThreats.length);
+
+  }, [threats]);
+
+  const neutralizeThreat = async (threatId: number) => {
+    try {
+      const response = await fetch(`/api/victor/threats`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: threatId, status: 'neutralized' }),
+      });
+
+      if (response.ok) {
+        const updatedThreat = await response.json();
+        setThreats(prev => prev.map(threat =>
+          threat.id === threatId
+            ? { ...threat, status: 'neutralized' as const }
+            : threat
+        ));
+        onThreatNeutralized?.(threatId);
       }
-      return sum + (severityMultiplier[threat.severity] * threat.confidence / 100)
-    }, 0)
-    
-    setThreatLevel(Math.min(1, newThreatLevel))
-  }, [threats])
-
-  const generateRandomThreat = (): Threat => {
-    const threatTypes = ['Code Clone', 'Data Breach', 'API Attack', 'Identity Theft', 'Network Intrusion']
-    const severities: Array<'low' | 'medium' | 'high' | 'critical'> = ['low', 'medium', 'high', 'critical']
-    const locations = ['GitHub', 'Cloud Storage', 'API Gateway', 'Database', 'Network', 'Dark Web']
-    const sources = ['GitHub Monitor', 'Cloud Security', 'API Gateway', 'Network Monitor', 'Threat Intelligence']
-    
-    const type = threatTypes[Math.floor(Math.random() * threatTypes.length)]
-    const severity = severities[Math.floor(Math.random() * severities.length)]
-    const location = locations[Math.floor(Math.random() * locations.length)]
-    const source = sources[Math.floor(Math.random() * sources.length)]
-    
-    return {
-      id: Date.now(),
-      type,
-      severity,
-      status: 'detected',
-      location,
-      description: `${type} detected in ${location.toLowerCase()}`,
-      timestamp: new Date(),
-      confidence: Math.floor(Math.random() * 40) + 60,
-      source
+    } catch (error) {
+      console.error('Failed to neutralize threat', error);
     }
-  }
-
-  const neutralizeThreat = (threatId: number) => {
-    setThreats(prev => prev.map(threat => 
-      threat.id === threatId 
-        ? { ...threat, status: 'neutralized' as const }
-        : threat
-    ))
-    setTotalThreatsNeutralized(prev => prev + 1)
-    onThreatNeutralized?.(threatId)
-  }
+  };
 
   const toggleScanning = () => {
     setIsScanning(!isScanning)

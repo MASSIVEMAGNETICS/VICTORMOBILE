@@ -34,111 +34,118 @@ interface MobileFeaturesProps {
 export default function MobileFeatures({ onLocationUpdate, onConnectionChange }: MobileFeaturesProps) {
   const [location, setLocation] = useState<{ lat: number; lng: number; accuracy: number } | null>(null)
   const [isOnline, setIsOnline] = useState(true)
-  const [batteryLevel, setBatteryLevel] = useState(85)
-  const [signalStrength, setSignalStrength] = useState(78)
+  const [battery, setBattery] = useState({ level: 1, charging: false });
+  const [signalStrength, setSignalStrength] = useState(100)
   const [isOfflineMode, setIsOfflineMode] = useState(false)
   const [syncProgress, setSyncProgress] = useState(0)
-  const [lastSync, setLastSync] = useState<Date | null>(new Date())
+  const [lastSync, setLastSync] = useState<Date | null>(null)
   const [locationPermission, setLocationPermission] = useState<'granted' | 'denied' | 'prompt'>('prompt')
   
-  const [offlineData, setOfflineData] = useState({
-    conversations: 147,
-    thoughts: 89,
-    timelineStates: 23,
-    threatReports: 5,
-    lastBackup: new Date(Date.now() - 2 * 60 * 60 * 1000) // 2 hours ago
-  })
+  const [offlineData, setOfflineData] = useState<any>(null)
 
   useEffect(() => {
-    // Simulate network status monitoring
-    const handleOnline = () => {
-      setIsOnline(true)
-      onConnectionChange?.(true)
+    // Network Status
+    const handleOnline = () => { setIsOnline(true); onConnectionChange?.(true); };
+    const handleOffline = () => { setIsOnline(false); onConnectionChange?.(false); };
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    setIsOnline(navigator.onLine);
+
+    // Battery Status
+    let batteryManager: any;
+    const updateBatteryStatus = () => {
+      setBattery({ level: batteryManager.level * 100, charging: batteryManager.charging });
+    };
+    if ('getBattery' in navigator) {
+      (navigator as any).getBattery().then((bm: any) => {
+        batteryManager = bm;
+        updateBatteryStatus();
+        batteryManager.addEventListener('levelchange', updateBatteryStatus);
+        batteryManager.addEventListener('chargingchange', updateBatteryStatus);
+      });
     }
-    
-    const handleOffline = () => {
-      setIsOnline(false)
-      onConnectionChange?.(false)
-    }
 
-    window.addEventListener('online', handleOnline)
-    window.addEventListener('offline', handleOffline)
-
-    // Simulate battery level changes
-    const batteryInterval = setInterval(() => {
-      setBatteryLevel(prev => {
-        const change = Math.random() > 0.7 ? -1 : 0
-        return Math.max(0, Math.min(100, prev + change))
-      })
-    }, 30000)
-
-    // Simulate signal strength changes
+    // Signal Strength (simulated, as there's no direct browser API)
     const signalInterval = setInterval(() => {
       setSignalStrength(prev => {
-        const change = (Math.random() - 0.5) * 10
-        return Math.max(0, Math.min(100, prev + change))
-      })
-    }, 10000)
+        const change = (Math.random() - 0.5) * 10;
+        return Math.max(0, Math.min(100, prev + change));
+      });
+    }, 10000);
 
     return () => {
-      window.removeEventListener('online', handleOnline)
-      window.removeEventListener('offline', handleOffline)
-      clearInterval(batteryInterval)
-      clearInterval(signalInterval)
-    }
-  }, [onConnectionChange])
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+      if (batteryManager) {
+        batteryManager.removeEventListener('levelchange', updateBatteryStatus);
+        batteryManager.removeEventListener('chargingchange', updateBatteryStatus);
+      }
+      clearInterval(signalInterval);
+    };
+  }, [onConnectionChange]);
 
   const requestLocationPermission = () => {
-    // Simulate location permission request
-    setLocationPermission('granted')
-    
-    // Simulate getting location
-    setTimeout(() => {
-      const mockLocation = {
-        lat: 40.7128 + (Math.random() - 0.5) * 0.01,
-        lng: -74.0060 + (Math.random() - 0.5) * 0.01,
-        accuracy: Math.floor(Math.random() * 20) + 5
-      }
-      setLocation(mockLocation)
-      onLocationUpdate?.(mockLocation)
-    }, 1000)
-  }
-
-  const toggleOfflineMode = () => {
-    if (!isOfflineMode) {
-      // Prepare for offline mode - sync data
-      setSyncProgress(0)
-      const syncInterval = setInterval(() => {
-        setSyncProgress(prev => {
-          if (prev >= 100) {
-            clearInterval(syncInterval)
-            setIsOfflineMode(true)
-            setLastSync(new Date())
-            return 100
-          }
-          return prev + 10
-        })
-      }, 200)
-    } else {
-      // Exit offline mode
-      setIsOfflineMode(false)
-      setSyncProgress(0)
-    }
-  }
-
-  const performSync = () => {
-    setSyncProgress(0)
-    const syncInterval = setInterval(() => {
-      setSyncProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(syncInterval)
-          setLastSync(new Date())
-          return 100
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude, accuracy } = position.coords;
+          const newLocation = { lat: latitude, lng: longitude, accuracy };
+          setLocation(newLocation);
+          onLocationUpdate?.(newLocation);
+          setLocationPermission('granted');
+        },
+        (error) => {
+          console.error("Geolocation error:", error);
+          setLocationPermission('denied');
         }
-        return prev + 15
-      })
-    }, 150)
-  }
+      );
+    } else {
+      setLocationPermission('denied');
+    }
+  };
+
+  const performSync = async () => {
+    if (isOfflineMode) { // Upload local changes first
+        await fetch('/api/victor/sync/upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(offlineData)
+        });
+    }
+    
+    setSyncProgress(0);
+    try {
+      const response = await fetch('/api/victor/sync/download');
+      if(response.ok) {
+          const data = await response.json();
+          setOfflineData(data);
+          setLastSync(new Date());
+          // Simulate progress
+          const interval = setInterval(() => {
+              setSyncProgress(p => {
+                  if (p >= 100) {
+                      clearInterval(interval);
+                      return 100;
+                  }
+                  return p + 20;
+              });
+          }, 100);
+      }
+    } catch(error) {
+        console.error("Sync failed", error);
+    }
+  };
+
+  const toggleOfflineMode = async () => {
+    if (!isOfflineMode) {
+      await performSync(); // Sync before going offline
+      setIsOfflineMode(true);
+    } else {
+      await performSync(); // Sync on returning online
+      setIsOfflineMode(false);
+    }
+  };
+
 
   const formatTimeAgo = (date: Date) => {
     const now = new Date()
@@ -178,10 +185,10 @@ export default function MobileFeatures({ onLocationUpdate, onConnectionChange }:
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-xl font-bold text-green-400">{batteryLevel}%</div>
-            <Progress value={batteryLevel} className="mt-2 h-2" />
+            <div className="text-xl font-bold text-green-400">{battery.level.toFixed(0)}%</div>
+            <Progress value={battery.level} className="mt-2 h-2" />
             <div className="text-xs text-gray-400 mt-1">
-              {batteryLevel > 20 ? 'Good' : 'Low'}
+              {battery.charging ? 'Charging' : battery.level > 20 ? 'Good' : 'Low'}
             </div>
           </CardContent>
         </Card>
@@ -359,7 +366,7 @@ export default function MobileFeatures({ onLocationUpdate, onConnectionChange }:
                 </Button>
               </div>
 
-              {isOfflineMode && (
+              {isOfflineMode && offlineData && (
                 <div className="bg-slate-700/50 p-4 rounded-lg">
                   <h4 className="text-sm font-medium mb-3">Offline Data Available</h4>
                   <div className="grid grid-cols-2 gap-3">

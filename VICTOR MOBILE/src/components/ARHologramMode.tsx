@@ -1,16 +1,17 @@
 "use client"
 
-import { useState, useEffect, useRef } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Progress } from '@/components/ui/progress'
-import { 
-  Camera, 
-  Eye, 
-  EyeOff, 
-  MapPin, 
-  Brain, 
+import { useState, useEffect, useRef } from 'react';
+import HologramVisualization from './HologramVisualization';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
+import {
+  Camera,
+  Eye,
+  EyeOff,
+  MapPin,
+  Brain,
   Activity,
   Target,
   Zap,
@@ -19,77 +20,80 @@ import {
   Maximize,
   Minimize,
   RotateCcw,
-  Settings
-} from 'lucide-react'
+  Settings,
+} from 'lucide-react';
 
 interface ARHologramModeProps {
-  isActive: boolean
-  onToggle: () => void
+  isActive: boolean;
+  onToggle: () => void;
 }
 
 export default function ARHologramMode({ isActive, onToggle }: ARHologramModeProps) {
-  const [arMode, setArMode] = useState<'inactive' | 'activating' | 'active'>('inactive')
-  const [hologramOpacity, setHologramOpacity] = useState(80)
-  const [hologramScale, setHologramScale] = useState(100)
-  const [selectedView, setSelectedView] = useState<'emperor' | 'warrior' | 'thinker'>('emperor')
-  const [calibrationProgress, setCalibrationProgress] = useState(0)
-  const [trackingQuality, setTrackingQuality] = useState(0)
-  
-  const videoRef = useRef<HTMLVideoElement>(null)
-  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const [arMode, setArMode] = useState<'inactive' | 'activating' | 'active'>('inactive');
+  const [hologramOpacity, setHologramOpacity] = useState(80);
+  const [hologramScale, setHologramScale] = useState(100);
+  const [selectedView, setSelectedView] = useState<'emperor' | 'warrior' | 'thinker'>('emperor');
+  const [calibrationProgress, setCalibrationProgress] = useState(0);
+  const [trackingQuality, setTrackingQuality] = useState(0);
+  const [hologramData, setHologramData] = useState(null);
 
   useEffect(() => {
+    let trackingInterval: NodeJS.Timeout;
+    let dataInterval: NodeJS.Timeout;
+
+    const fetchHologramData = async () => {
+      try {
+        const response = await fetch('/api/victor/hologram');
+        if (response.ok) {
+          const data = await response.json();
+          setHologramData(data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch hologram data', error);
+      }
+    };
+
     if (isActive) {
-      setArMode('activating')
-      // Simulate AR activation sequence
+      setArMode('activating');
       const activationInterval = setInterval(() => {
         setCalibrationProgress(prev => {
           if (prev >= 100) {
-            clearInterval(activationInterval)
-            setArMode('active')
-            startTracking()
-            return 100
-          }
-          return prev + 10
-        })
-      }, 200)
-    } else {
-      setArMode('inactive')
-      setCalibrationProgress(0)
-      setTrackingQuality(0)
-    }
-  }, [isActive])
+            clearInterval(activationInterval);
+            setArMode('active');
 
-  const startTracking = () => {
-    // Simulate AR tracking quality
-    const trackingInterval = setInterval(() => {
-      if (arMode !== 'active') {
-        clearInterval(trackingInterval)
-        return
-      }
-      
-      setTrackingQuality(prev => {
-        const change = (Math.random() - 0.5) * 10
-        const newValue = Math.max(0, Math.min(100, prev + change))
-        return newValue
-      })
-    }, 1000)
-  }
+            // Start fetching data and simulating tracking
+            fetchHologramData();
+            dataInterval = setInterval(fetchHologramData, 5000); // Refresh data every 5 seconds
+
+            trackingInterval = setInterval(() => {
+              setTrackingQuality(prev => {
+                const change = (Math.random() - 0.5) * 10;
+                const newValue = Math.max(0, Math.min(100, prev + change));
+                return newValue;
+              });
+            }, 1000);
+
+            return 100;
+          }
+          return prev + 10;
+        });
+      }, 200);
+    } else {
+      setArMode('inactive');
+      setCalibrationProgress(0);
+      setTrackingQuality(0);
+      setHologramData(null);
+    }
+
+    return () => {
+      clearInterval(trackingInterval);
+      clearInterval(dataInterval);
+    };
+  }, [isActive]);
 
   const handleViewChange = (view: 'emperor' | 'warrior' | 'thinker') => {
-    setSelectedView(view)
-    // Simulate view change animation
-    setCalibrationProgress(0)
-    const viewChangeInterval = setInterval(() => {
-      setCalibrationProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(viewChangeInterval)
-          return 100
-        }
-        return prev + 20
-      })
-    }, 100)
-  }
+    setSelectedView(view);
+  };
 
   const hologramViews = {
     emperor: {
@@ -327,37 +331,17 @@ export default function ARHologramMode({ isActive, onToggle }: ARHologramModePro
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="relative bg-black rounded-lg overflow-hidden" style={{ height: '300px' }}>
-              {/* Simulated AR view */}
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="text-center">
-                  <div className="w-24 h-24 mx-auto mb-4 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 opacity-80 animate-pulse" />
-                  <h3 className="text-lg font-bold text-yellow-400">
-                    {hologramViews[selectedView].name}
-                  </h3>
-                  <p className="text-sm text-gray-400 mt-2">
-                    Hologram projected in your space
-                  </p>
-                </div>
+            {hologramData ? (
+              <HologramVisualization
+                hologramData={hologramData}
+                opacity={hologramOpacity}
+                scale={hologramScale}
+              />
+            ) : (
+              <div className="flex items-center justify-center h-[300px]">
+                <p>Loading hologram data...</p>
               </div>
-              
-              {/* AR overlay elements */}
-              <div className="absolute top-4 left-4">
-                <Badge variant="outline" className="border-green-500 text-green-300">
-                  AR ACTIVE
-                </Badge>
-              </div>
-              <div className="absolute top-4 right-4">
-                <Badge variant="outline" className="border-blue-500 text-blue-300">
-                  Tracking: {trackingQuality.toFixed(0)}%
-                </Badge>
-              </div>
-              <div className="absolute bottom-4 left-4">
-                <Badge variant="outline" className="border-purple-500 text-purple-300">
-                  {hologramViews[selectedView].name}
-                </Badge>
-              </div>
-            </div>
+            )}
           </CardContent>
         </Card>
       )}

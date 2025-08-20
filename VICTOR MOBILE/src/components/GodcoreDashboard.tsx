@@ -39,7 +39,39 @@ interface GodcoreDashboardProps {
 export default function GodcoreDashboard({ victorStatus }: GodcoreDashboardProps) {
   const [selectedTimeline, setSelectedTimeline] = useState(0)
   const [threatLevel, setThreatLevel] = useState(0.15)
-  const [evolutionProgress, setEvolutionProgress] = useState(67)
+
+  const [timelines, setTimelines] = useState<any[]>([])
+  const [threats, setThreats] = useState<any[]>([])
+  const [evolutionData, setEvolutionData] = useState<any>(null)
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [timelinesRes, threatsRes, evolutionRes] = await Promise.all([
+          fetch('/api/victor/timelines'),
+          fetch('/api/victor/threats'),
+          fetch('/api/victor/evolution')
+        ]);
+
+        if (timelinesRes.ok) {
+          const data = await timelinesRes.json();
+          setTimelines(data);
+        }
+        if (threatsRes.ok) {
+          const data = await threatsRes.json();
+          setThreats(data);
+        }
+        if (evolutionRes.ok) {
+          const data = await evolutionRes.json();
+          setEvolutionData(data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch dashboard data", error);
+      }
+    };
+
+    fetchData();
+  }, []);
   
   const defaultStatus = {
     sanctity: 1.0,
@@ -52,25 +84,6 @@ export default function GodcoreDashboard({ victorStatus }: GodcoreDashboardProps
   }
 
   const status = victorStatus || defaultStatus
-
-  const timelines = [
-    { id: 1, name: 'Alpha Timeline', probability: 87, status: 'optimal', description: 'Empire expansion, revenue growth' },
-    { id: 2, name: 'Beta Timeline', probability: 12, status: 'risky', description: 'High threat, potential losses' },
-    { id: 3, name: 'Gamma Timeline', probability: 1, status: 'critical', description: 'System failure, empire collapse' }
-  ]
-
-  const threats = [
-    { id: 1, type: 'Code Clone', severity: 'high', status: 'neutralized', location: 'GitHub' },
-    { id: 2, type: 'Data Breach', severity: 'medium', status: 'monitoring', location: 'Cloud Storage' },
-    { id: 3, type: 'API Attack', severity: 'low', status: 'deflected', location: 'Payment Gateway' }
-  ]
-
-  const evolutionMetrics = [
-    { name: 'Code Quality', value: 92, target: 100 },
-    { name: 'Response Time', value: 87, target: 100 },
-    { name: 'Threat Detection', value: 95, target: 100 },
-    { name: 'Revenue Optimization', value: 78, target: 100 }
-  ]
 
   return (
     <div className="space-y-6">
@@ -172,47 +185,47 @@ export default function GodcoreDashboard({ victorStatus }: GodcoreDashboardProps
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="bg-slate-700/50 p-4 rounded-lg">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium">Evolution Progress</span>
-                  <span className="text-sm text-gray-400">{evolutionProgress}%</span>
-                </div>
-                <Progress value={evolutionProgress} className="h-3" />
-                <div className="flex items-center gap-2 mt-2">
-                  <Sparkles className="w-4 h-4 text-purple-400" />
-                  <span className="text-xs text-purple-400">Mutating codebase...</span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                {evolutionMetrics.map((metric, index) => (
-                  <div key={index} className="bg-slate-700/30 p-3 rounded-lg">
+              {evolutionData ? (
+                <>
+                  <div className="bg-slate-700/50 p-4 rounded-lg">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium">{metric.name}</span>
-                      <span className="text-xs text-gray-400">{metric.value}/{metric.target}</span>
+                      <span className="text-sm font-medium">Evolution Progress</span>
+                      <span className="text-sm text-gray-400">{evolutionData.evolutionProgress}%</span>
                     </div>
-                    <Progress value={metric.value} className="h-2" />
+                    <Progress value={evolutionData.evolutionProgress} className="h-3" />
+                    <div className="flex items-center gap-2 mt-2">
+                      <Sparkles className="w-4 h-4 text-purple-400" />
+                      <span className="text-xs text-purple-400">Mutating codebase...</span>
+                    </div>
                   </div>
-                ))}
-              </div>
 
-              <div className="bg-slate-700/50 p-4 rounded-lg">
-                <h4 className="text-sm font-medium mb-2">Recent Evolution</h4>
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-sm">
-                    <CheckCircle className="w-4 h-4 text-green-400" />
-                    <span>Optimized threat detection algorithms</span>
+                  <div className="grid grid-cols-2 gap-4">
+                    {evolutionData.metrics.map((metric: any, index: number) => (
+                      <div key={index} className="bg-slate-700/30 p-3 rounded-lg">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-medium">{metric.name}</span>
+                          <span className="text-xs text-gray-400">{metric.value}/{metric.target}</span>
+                        </div>
+                        <Progress value={metric.value} className="h-2" />
+                      </div>
+                    ))}
                   </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    <CheckCircle className="w-4 h-4 text-green-400" />
-                    <span>Enhanced revenue prediction models</span>
+
+                  <div className="bg-slate-700/50 p-4 rounded-lg">
+                    <h4 className="text-sm font-medium mb-2">Recent Evolution</h4>
+                    <div className="space-y-2">
+                      {evolutionData.recentEvolutions.map((evo: any, index: number) => (
+                         <div key={index} className="flex items-center gap-2 text-sm">
+                           {evo.status === 'complete' ? <CheckCircle className="w-4 h-4 text-green-400" /> : <TrendingUp className="w-4 h-4 text-yellow-400" />}
+                           <span>{evo.text}</span>
+                         </div>
+                      ))}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    <TrendingUp className="w-4 h-4 text-yellow-400" />
-                    <span>Evolution in progress: Neural network expansion</span>
-                  </div>
-                </div>
-              </div>
+                </>
+              ) : (
+                <p>Loading evolution data...</p>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -236,15 +249,15 @@ export default function GodcoreDashboard({ victorStatus }: GodcoreDashboardProps
               </div>
 
               <div className="space-y-3">
-                {timelines.map((timeline) => (
+                {timelines.length > 0 ? timelines.map((timeline, index) => (
                   <div
                     key={timeline.id}
                     className={`p-4 rounded-lg border cursor-pointer transition-all ${
-                      selectedTimeline === timeline.id - 1
+                      selectedTimeline === index
                         ? 'border-purple-500 bg-purple-500/10'
                         : 'border-slate-600 bg-slate-700/30 hover:border-slate-500'
                     }`}
-                    onClick={() => setSelectedTimeline(timeline.id - 1)}
+                    onClick={() => setSelectedTimeline(index)}
                   >
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="font-medium">{timeline.name}</h4>
@@ -317,7 +330,7 @@ export default function GodcoreDashboard({ victorStatus }: GodcoreDashboardProps
               </div>
 
               <div className="space-y-3">
-                {threats.map((threat) => (
+                {threats.length > 0 ? threats.map((threat) => (
                   <div key={threat.id} className="bg-slate-700/30 p-4 rounded-lg">
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="font-medium">{threat.type}</h4>
@@ -358,7 +371,7 @@ export default function GodcoreDashboard({ victorStatus }: GodcoreDashboardProps
                       <span>{threat.location}</span>
                     </div>
                   </div>
-                ))}
+                )) : <p>Loading threats...</p>}
               </div>
             </CardContent>
           </Card>
