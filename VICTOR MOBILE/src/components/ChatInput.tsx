@@ -63,24 +63,47 @@ export default function ChatInput({
     }
   }
 
-  const handleVoiceToggle = () => {
-    setIsListening(!isListening)
-    if (!isListening && onVoiceCommand) {
-      // Simulate voice command after a delay
-      setTimeout(() => {
-        const demoCommands = [
-          "Victor, show me the dashboard",
-          "How are you feeling today?",
-          "Scan for any threats",
-          "Activate AR hologram mode",
-          "What's our current status?"
-        ]
-        const randomCommand = demoCommands[Math.floor(Math.random() * demoCommands.length)]
-        onVoiceCommand(randomCommand)
-        setIsListening(false)
-      }, 2000)
+  const recognitionRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        recognitionRef.current = new SpeechRecognition();
+        recognitionRef.current.continuous = false;
+        recognitionRef.current.interimResults = false;
+        recognition.lang = 'en-US';
+
+        recognitionRef.current.onresult = (event: any) => {
+          const transcript = event.results[0][0].transcript;
+          if (onVoiceCommand) {
+            onVoiceCommand(transcript);
+          }
+          setIsListening(false);
+        };
+
+        recognitionRef.current.onerror = (event: any) => {
+          console.error("Speech recognition error", event.error);
+          setIsListening(false);
+        };
+
+        recognitionRef.current.onend = () => {
+            setIsListening(false);
+        };
+      }
     }
-  }
+  }, [onVoiceCommand]);
+
+  const handleVoiceToggle = () => {
+    if (!recognitionRef.current) return;
+
+    if (isListening) {
+      recognitionRef.current.stop();
+    } else {
+      recognitionRef.current.start();
+    }
+    setIsListening(!isListening);
+  };
 
   const quickActions = [
     { label: "Status", command: "What's our status?" },

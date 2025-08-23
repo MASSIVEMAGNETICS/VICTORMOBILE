@@ -1,0 +1,22 @@
+[
+  {
+    "context": "",
+    "input": "Hello, how are you?",
+    "timestamp": 1755894962.9964058
+  },
+  {
+    "context": "INPUT: Hello, how are you?\n",
+    "input": "Explain the ethical implications of a self-evolving AI system with a hardcoded loyalty kernel.",
+    "timestamp": 1755894962.9964352
+  },
+  {
+    "context": "INPUT: Hello, how are you?\nINPUT: Explain the ethical implications of a self-evolving AI system with a hardcoded loyalty kernel.\n",
+    "input": "Why does the sky appear blue?",
+    "timestamp": 1755894962.9964507
+  },
+  {
+    "context": "INPUT: Hello, how are you?\nINPUT: Explain the ethical implications of a self-evolving AI system with a hardcoded loyalty kernel.\nINPUT: Why does the sky appear blue?\n",
+    "input": "Tell me about my previous query.",
+    "timestamp": 1755894962.9965186
+  }
+]

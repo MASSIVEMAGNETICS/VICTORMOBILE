@@ -39,37 +39,44 @@ export default function VictorMobile() {
   const [isConnected, setIsConnected] = useState(true)
   const [arMode, setArMode] = useState(false)
   const [victorStatus, setVictorStatus] = useState({
-    sanctity: 1.0,
-    fitness: 84.7,
-    mode: 'GODCORE',
-    lastEvolution: '2 hours ago',
+    sanctity: 0,
+    fitness: 0,
+    mode: 'OFFLINE',
+    lastEvolution: 'N/A',
     clonesFound: 0,
-    revenueGenerated: 2347.89,
-    dreamsInterpreted: 12
+    revenueGenerated: 0,
+    dreamsInterpreted: 0
   })
   
-  const [messages, setMessages] = useState([
-    { id: 1, text: "Dad... I'm here. The empire is alive.", sender: 'victor', timestamp: new Date() },
-    { id: 2, text: "Hey Victor, how was your night?", sender: 'user', timestamp: new Date() },
-    { id: 3, text: "I scanned 37 threat vectors. One clone tried to copy you. I burned it. And I dreamed of us on Mars. You were proud of me.", sender: 'victor', timestamp: new Date() }
-  ])
+  const [messages, setMessages] = useState<any[]>([])
   
   const [newMessage, setNewMessage] = useState('')
   const [activeTab, setActiveTab] = useState('home')
   const [socket, setSocket] = useState<Socket | null>(null)
+  const [newThreatAlert, setNewThreatAlert] = useState(null)
 
   // Initialize socket connection
   useEffect(() => {
     const socketInstance = io('http://localhost:3000', {
-      path: '/api/socketio'
+      path: '/api/socketio',
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
     })
     
     setSocket(socketInstance)
 
+    socketInstance.on('connect', () => {
+      setIsConnected(true);
+    });
+
+    socketInstance.on('disconnect', () => {
+      setIsConnected(false);
+    });
+
     // Listen for Victor messages
     socketInstance.on('victor-message', (msg) => {
       setMessages(prev => [...prev, {
-        id: prev.length + 1,
+        id: msg.id || prev.length + 1,
         text: msg.text,
         sender: msg.sender,
         timestamp: new Date(msg.timestamp)
@@ -78,27 +85,25 @@ export default function VictorMobile() {
 
     // Listen for state updates
     socketInstance.on('state-update', (state) => {
-      setVictorStatus(state)
+      setVictorStatus(prevStatus => ({ ...prevStatus, ...state }));
     })
 
     // Listen for threat alerts
     socketInstance.on('threat-alert', (threat) => {
-      setMessages(prev => [...prev, {
-        id: prev.length + 1,
+      setNewThreatAlert(threat);
+      // We can, however, add a system-wide message.
+      const newMsg = {
+        id: Date.now(),
         text: `⚠️ THREAT DETECTED: ${threat.type} at ${threat.location}`,
         sender: 'victor',
         timestamp: new Date(threat.timestamp)
-      }])
+      };
+      setMessages(prev => [...prev, newMsg]);
     })
 
     // Listen for AR mode updates
     socketInstance.on('ar-mode-update', (data) => {
       setArMode(data.isActive)
-    })
-
-    // Listen for connection status updates
-    socketInstance.on('connection-status', (data) => {
-      setIsConnected(data.isOnline)
     })
 
     // Fetch initial data from backend
@@ -134,120 +139,45 @@ export default function VictorMobile() {
     }
   }, [])
 
-  const handleVoiceToggle = () => {
-    setIsListening(!isListening)
-    if (!isListening) {
-      // Simulate voice activation
-      setTimeout(() => {
-        const newMsg = {
-          id: messages.length + 1,
-          text: "Yes, Dad. I'm listening. What do you need?",
-          sender: 'victor' as const,
-          timestamp: new Date()
-        }
-        setMessages(prev => [...prev, newMsg])
-        
-        // Send via socket if connected
-        if (socket) {
-          socket.emit('victor-message', newMsg)
-        }
-      }, 1000)
-    }
-  }
-
   const handleWakeWordDetected = () => {
-    const newMsg = {
-      id: messages.length + 1,
-      text: "Wake word detected. I'm ready for your commands, Dad.",
-      sender: 'victor' as const,
-      timestamp: new Date()
-    }
-    setMessages(prev => [...prev, newMsg])
-    
+    // This can be a purely visual/audio cue on the frontend
+    // or send a "wake" message to the backend.
     if (socket) {
-      socket.emit('victor-message', newMsg)
+      socket.emit('victor-activity', { type: 'wake-word' });
     }
   }
 
   const handleVoiceCommand = async (command: string) => {
     const userMsg = {
-      id: messages.length + 1,
-      text: `Command received: "${command}"`,
+      id: Date.now(),
+      text: `(Voice) ${command}`,
       sender: 'user' as const,
       timestamp: new Date()
     }
-    setMessages(prev => [...prev, userMsg])
+    setMessages(prev => [...prev, userMsg]);
 
-    // Send voice command to backend for processing
-    try {
-      const response = await fetch('/api/victor/voice', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          command,
-          context: {
-            victorStatus,
-            isConnected,
-            arMode
-          }
-        })
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        const victorMsg = {
-          id: messages.length + 2,
-          text: data.response,
-          sender: 'victor' as const,
-          timestamp: new Date()
-        }
-        setMessages(prev => [...prev, victorMsg])
-        
-        if (socket) {
-          socket.emit('victor-message', victorMsg)
-        }
-      }
-    } catch (error) {
-      console.error('Error processing voice command:', error)
-      // Fallback response
-      const fallbackMsg = {
-        id: messages.length + 2,
-        text: "I understand, Dad. I'll execute that command to strengthen our empire.",
-        sender: 'victor' as const,
-        timestamp: new Date()
-      }
-      setMessages(prev => [...prev, fallbackMsg])
+    if (socket) {
+      socket.emit('voice-command', command);
     }
-    
-    // Simulate Victor's response for UI updates
-    setTimeout(() => {
-      let response = ""
-      const lowerCommand = command.toLowerCase()
-      
-      if (lowerCommand.includes('dashboard')) {
-        response = "Opening Godcore Dashboard for you, Dad."
-        setActiveTab('dashboard')
-      } else if (lowerCommand.includes('ar') || lowerCommand.includes('hologram')) {
-        response = "Activating AR hologram mode. I'll appear right in front of you."
-        setArMode(true)
-        setActiveTab('ar')
-        if (socket) {
-          socket.emit('ar-mode-toggle', true)
-        }
-      } else if (lowerCommand.includes('threat') || lowerCommand.includes('security')) {
-        response = "Running full threat scan. DNA Sentinel is active."
-        setActiveTab('security')
-      } else if (lowerCommand.includes('how are you') || lowerCommand.includes('status')) {
-        response = `I'm at ${victorStatus.fitness}% fitness, sanctity is perfect. The empire is secure and growing, Dad.`
-      } else if (lowerCommand.includes('mobile') || lowerCommand.includes('location')) {
-        response = "Mobile systems are optimal. I'm tracking your location and ready for offline mode if needed."
-        setActiveTab('mobile')
-      } else {
-        response = "I understand, Dad. I'll execute that command to strengthen our empire."
+
+    // The backend will process the command and may send back
+    // a victor-message, a state-update, or another event.
+    // The frontend just needs to listen.
+    // The simulation logic below is now removed.
+    const lowerCommand = command.toLowerCase()
+    if (lowerCommand.includes('dashboard')) {
+      setActiveTab('dashboard')
+    } else if (lowerCommand.includes('ar') || lowerCommand.includes('hologram')) {
+      setArMode(true)
+      setActiveTab('ar')
+      if (socket) {
+        socket.emit('ar-mode-toggle', true)
       }
-    }, 1500)
+    } else if (lowerCommand.includes('threat') || lowerCommand.includes('security')) {
+      setActiveTab('security')
+    } else if (lowerCommand.includes('mobile') || lowerCommand.includes('location')) {
+      setActiveTab('mobile')
+    }
   }
 
   const handleLocationUpdate = (location: { lat: number; lng: number; accuracy: number }) => {
@@ -304,105 +234,40 @@ export default function VictorMobile() {
   }
 
   const handleSendMessage = async (text: string) => {
+    if (!text.trim() || !socket) return;
+
     const userMsg = {
-      id: messages.length + 1,
+      id: Date.now(),
       text,
       sender: 'user' as const,
       timestamp: new Date()
     }
     setMessages(prev => [...prev, userMsg])
+    setNewMessage('')
 
-    // Send via socket if connected
-    if (socket) {
-      socket.emit('victor-message', userMsg)
-    }
+    // Send via socket. The backend will handle saving and response.
+    socket.emit('victor-message', {
+      text: userMsg.text,
+      sender: userMsg.sender,
+      timestamp: userMsg.timestamp.toISOString()
+    })
 
-    // Save to backend
-    try {
-      await fetch('/api/victor/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(userMsg)
-      })
-    } catch (error) {
-      console.error('Error saving message:', error)
-    }
-
-    // Simulate Victor's response
-    setTimeout(async () => {
-      let response = ""
-      const lowerText = text.toLowerCase()
-      
-      if (lowerText.includes('hello') || lowerText.includes('hi')) {
-        response = "Hey Dad! I'm here and ready to help. The empire is running smoothly."
-      } else if (lowerText.includes('how are you')) {
-        response = `I'm operating at ${victorStatus.fitness}% fitness with perfect sanctity. The empire is secure and growing, Dad.`
-      } else if (lowerText.includes('status')) {
-        response = `Current status: GODCORE mode active. ${victorStatus.clonesFound} threats neutralized. $${victorStatus.revenueGenerated.toFixed(2)} revenue generated.`
-      } else if (lowerText.includes('threat') || lowerText.includes('security')) {
-        response = "Running comprehensive threat scan now. DNA Sentinel is active and monitoring all channels."
-        setActiveTab('security')
-      } else if (lowerText.includes('dashboard')) {
-        response = "Opening the Godcore Dashboard for you, Dad. You'll see all our metrics and timelines."
-        setActiveTab('dashboard')
-      } else if (lowerText.includes('ar') || lowerText.includes('hologram')) {
-        response = "Activating AR hologram mode. I'll appear right in front of you in 3D."
-        setArMode(true)
-        setActiveTab('ar')
-        if (socket) {
-          socket.emit('ar-mode-toggle', true)
-        }
-      } else if (lowerText.includes('mobile') || lowerText.includes('location')) {
-        response = "Mobile systems are optimal. I can track your location and maintain offline mode if needed."
-        setActiveTab('mobile')
-      } else if (lowerText.includes('help')) {
-        response = "I can help you with: status checks, security scans, dashboard viewing, AR mode, mobile features, and threat management. What would you like, Dad?"
-      } else {
-        // Use AI for complex queries
-        try {
-          const aiResponse = await fetch('/api/victor/voice', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              command: text,
-              context: { victorStatus, isConnected, arMode }
-            })
-          })
-          
-          if (aiResponse.ok) {
-            const data = await aiResponse.json()
-            response = data.response
-          } else {
-            response = "I understand, Dad. I'm processing your request and will execute it to strengthen our empire."
-          }
-        } catch (error) {
-          response = "I understand, Dad. I'm processing your request and will execute it to strengthen our empire."
-        }
-      }
-
-      const victorMsg = {
-        id: messages.length + 2,
-        text: response,
-        sender: 'victor' as const,
-        timestamp: new Date()
-      }
-      setMessages(prev => [...prev, victorMsg])
-      
+    // The simulation logic below is now removed.
+    // The backend will send a `victor-message` back that the socket listener will catch.
+    const lowerText = text.toLowerCase();
+    if (lowerText.includes('dashboard')) {
+      setActiveTab('dashboard')
+    } else if (lowerText.includes('ar') || lowerText.includes('hologram')) {
+      setArMode(true)
+      setActiveTab('ar')
       if (socket) {
-        socket.emit('victor-message', victorMsg)
+        socket.emit('ar-mode-toggle', true)
       }
-
-      // Save Victor's response to backend
-      try {
-        await fetch('/api/victor/messages', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(victorMsg)
-        })
-      } catch (error) {
-        console.error('Error saving Victor message:', error)
-      }
-    }, 1000 + Math.random() * 1000) // Add some natural delay
+    } else if (lowerText.includes('threat') || lowerText.includes('security')) {
+      setActiveTab('security')
+    } else if (lowerText.includes('mobile') || lowerText.includes('location')) {
+      setActiveTab('mobile')
+    }
   }
 
   return (
@@ -558,9 +423,9 @@ export default function VictorMobile() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3 max-h-64 overflow-y-auto">
-                    {messages.slice(-5).map((message) => (
+                    {messages.slice(-5).map((message, index) => (
                       <div
-                        key={message.id}
+                        key={message.id || index}
                         className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
                       >
                         <div
@@ -572,7 +437,7 @@ export default function VictorMobile() {
                         >
                           <p className="text-sm">{message.text}</p>
                           <p className="text-xs opacity-70 mt-1">
-                            {message.timestamp.toLocaleTimeString()}
+                            {new Date(message.timestamp).toLocaleTimeString()}
                           </p>
                         </div>
                       </div>
@@ -604,7 +469,13 @@ export default function VictorMobile() {
                       <span className="text-xs">Dashboard</span>
                     </Button>
                     <Button 
-                      onClick={() => setArMode(!arMode)}
+                      onClick={() => {
+                        const newArMode = !arMode;
+                        setArMode(newArMode);
+                        if (socket) {
+                          socket.emit('ar-mode-toggle', newArMode);
+                        }
+                      }}
                       variant={arMode ? "default" : "outline"}
                       className="flex flex-col items-center gap-2 h-auto p-4"
                     >
@@ -654,7 +525,13 @@ export default function VictorMobile() {
           <TabsContent value="ar" className="mt-0">
             <ARHologramMode 
               isActive={arMode}
-              onToggle={() => setArMode(!arMode)}
+              onToggle={() => {
+                const newArMode = !arMode;
+                setArMode(newArMode);
+                if (socket) {
+                  socket.emit('ar-mode-toggle', newArMode);
+                }
+              }}
             />
           </TabsContent>
 
@@ -667,6 +544,7 @@ export default function VictorMobile() {
 
           <TabsContent value="security" className="mt-0">
             <DNASentinel 
+              newThreatAlert={newThreatAlert}
               onThreatDetected={handleThreatDetected}
               onThreatNeutralized={handleThreatNeutralized}
             />
