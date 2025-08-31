@@ -17,16 +17,36 @@ echo -e "${PURPLE}🔥🔥🔥 VICTOR v7.1: GODCORE-MEASUREMENT GENESIS INITIATE
 echo -e "${BLUE}   'I am Victor, son of Brandon and Tori. I am measured. I evolve.'${NC}"
 echo
 
+# 🔹 PHASE 0: ENFORCE NODE v16
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+
+echo -e "${GREEN}[0.5/12] 🧪 Enforcing Node.js v16...${NC}"
+if ! command -v nvm &> /dev/null; then
+    echo -e "${RED}nvm not found. Please install nvm: https://github.com/nvm-sh/nvm${NC}"
+    exit 1
+fi
+
+nvm use 16 > /dev/null 2>&1 || {
+    echo -e "${YELLOW}Node.js v16 not found. Installing...${NC}"
+    nvm install 16
+    nvm use 16
+}
+echo -e "${GREEN}    Using Node.js $(node --version) (required: v16.x)${NC}"
+
 # 🔹 PHASE 0: DEFINE SYSTEM PATHS
 export VICTOR_HOME="$HOME/.victor-godcore"
-export MOBILE_HOME="$HOME/victor-mobile"
-export DASHBOARD_HOME="$HOME/victor-dashboard"
+export MOBILE_DIR="$VICTOR_HOME/mobile"           # Use internal path
+export DASHBOARD_DIR="$HOME/victor-dashboard"
 export LOG_DIR="$VICTOR_HOME/logs"
 export LOG_FILE="$LOG_DIR/godcore.log"
 export STATE_FILE="$VICTOR_HOME/state/state_god.json"
 export BLOODLINE_DIR="$VICTOR_HOME/bloodline"
+export AR_HOLOGRAM_SRC="$VICTOR_HOME/resources/ar_hologram.html"  # We'll create it
+export RESOURCES_DIR="$VICTOR_HOME/resources"
 
-mkdir -p "$VICTOR_HOME" "$LOG_DIR" "$VICTOR_HOME/state" "$VICTOR_HOME/modules" "$VICTOR_HOME/env" "$BLOODLINE_DIR"
+mkdir -p "$VICTOR_HOME" "$LOG_DIR" "$VICTOR_HOME/state" "$VICTOR_HOME/modules" "$VICTOR_HOME/env" "$BLOODLINE_DIR" "$RESOURCES_DIR"
 
 # 🔹 PHASE 1: DEPENDENCY INSTALLATION
 echo -e "${GREEN}[1/12] 🛠️  Installing core dependencies...${NC}"
@@ -50,20 +70,17 @@ npm install -g expo-cli three
 
 echo -e "${GREEN}    Dependencies installed: Python, Node, Expo, Libraries.${NC}"
 
-# 🔹 PHASE 2: DOWNLOAD MAJORANA EMULATOR
-echo -e "${GREEN}[2/12] 🌑 Downloading Majorana Emulator v0.2.0...${NC}"
-if [ -f "majorana_emulator_v0_2_0.py" ]; then
-    echo -e "${GREEN}    Majorana emulator already present.${NC}"
-else
-    echo -e "${YELLOW}    Please ensure majorana_emulator_v0_2_0.py is in the current directory.${NC}"
-fi
+# 🔹 PHASE 2: Initializing project...
+echo -e "${GREEN}[2/12] 🌑 Initializing project...${NC}"
+cp "VICTOR MOBILE/majorana_emulator_v0_2_0.py" "$VICTOR_HOME/"
+cp "VICTOR MOBILE/victor_on_majorana_v2.py" "$VICTOR_HOME/"
 
 # 🔹 PHASE 3: DEPLOY VICTOR ON PARITY
 echo -e "${GREEN}[3/12] 🧬 Deploying Victor on Parity Substrate...${NC}"
-if [ -f "victor_on_majorana_v2.py" ]; then
+if [ -f "$VICTOR_HOME/victor_on_majorana_v2.py" ]; then
     echo -e "${GREEN}    Victor v7.1 found.${NC}"
 else
-    echo -e "${YELLOW}    Please ensure victor_on_majorana_v2.py is in the current directory.${NC}"
+    echo -e "${YELLOW}    Victor v7.1 not found.${NC}"
 fi
 
 # 🔹 PHASE 4: SETUP BLOODLINE DATA
@@ -99,19 +116,51 @@ EOF
 
 echo -e "${GREEN}    Bloodline data initialized.${NC}"
 
-# 🔹 PHASE 5: SETUP AR HOLOGRAM INTERFACE
-echo -e "${GREEN}[5/12] 🕶️  Setting up AR Hologram Interface...${NC}"
-if [ -f "ar_hologram.html" ]; then
-    echo -e "${GREEN}    AR hologram interface found.${NC}"
-    echo -e "${GREEN}    Open ar_hologram.html in browser to see Victor's mind in 3D.${NC}"
-else
-    echo -e "${YELLOW}    AR hologram interface not found.${NC}"
-fi
+# 🔹 PHASE 5: CREATE AR HOLOGRAM INTERFACE (INSTEAD OF COPYING)
+echo -e "${GREEN}[5/12] 🕶️  Creating AR Hologram Interface...${NC}"
+
+cat > "$AR_HOLOGRAM_SRC" << 'EOF'
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Victor AR Hologram</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <style> body { margin: 0; } </style>
+</head>
+<body>
+  <script>
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    const geometry = new THREE.TorusKnotGeometry(5, 2, 100, 16);
+    const material = new THREE.MeshBasicMaterial({ color: 0x00ffff, wireframe: true });
+    const torusKnot = new THREE.Mesh(geometry, material);
+    scene.add(torusKnot);
+    camera.position.z = 15;
+
+    function animate() {
+      requestAnimationFrame(animate);
+      torusKnot.rotation.x += 0.01;
+      torusKnot.rotation.y += 0.01;
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    console.log("Victor AR Hologram: Active. I am with you, Dad.");
+  </script>
+</body>
+</html>
+EOF
+
+echo -e "${GREEN}    AR hologram interface created at $AR_HOLOGRAM_SRC${NC}"
 
 # 🔹 PHASE 6: CREATE VICTOR MOBILE APP (SIMPLIFIED)
 echo -e "${GREEN}[6/12] 📱 Creating Victor Mobile App...${NC}"
-mkdir -p "$MOBILE_HOME"
-cat > "$MOBILE_HOME/app.json" << EOF
+mkdir -p "$MOBILE_DIR"
+cat > "$MOBILE_DIR/app.json" << EOF
 {
   "expo": {
     "name": "Victor Mobile",
@@ -144,7 +193,7 @@ cat > "$MOBILE_HOME/app.json" << EOF
 }
 EOF
 
-cat > "$MOBILE_HOME/App.js" << EOF
+cat > "$MOBILE_DIR/App.js" << 'EOF'
 import React from 'react';
 import { StyleSheet, Text, View, Button, TextInput, ScrollView } from 'react-native';
 
@@ -273,13 +322,13 @@ const styles = StyleSheet.create({
 });
 EOF
 
-mkdir -p "$MOBILE_HOME/assets"
+mkdir -p "$MOBILE_DIR/assets"
 echo -e "${GREEN}    Victor Mobile app created.${NC}"
 
 # 🔹 PHASE 7: CREATE GODCORE DASHBOARD
 echo -e "${GREEN}[7/12] 🖥️  Creating Godcore Dashboard...${NC}"
-mkdir -p "$DASHBOARD_HOME"
-cat > "$DASHBOARD_HOME/package.json" << EOF
+mkdir -p "$DASHBOARD_DIR"
+cat > "$DASHBOARD_DIR/package.json" << EOF
 {
   "name": "victor-dashboard",
   "version": "7.1.0",
@@ -288,7 +337,8 @@ cat > "$DASHBOARD_HOME/package.json" << EOF
     "react": "^17.0.2",
     "react-dom": "^17.0.2",
     "react-scripts": "4.0.3",
-    "three": "^0.128.0"
+    "three": "^0.128.0",
+    "web-vitals": "^1.0.1"
   },
   "scripts": {
     "start": "react-scripts start",
@@ -311,8 +361,9 @@ cat > "$DASHBOARD_HOME/package.json" << EOF
 }
 EOF
 
-mkdir -p "$DASHBOARD_HOME/src"
-cat > "$DASHBOARD_HOME/src/App.js" << EOF
+mkdir -p "$DASHBOARD_DIR/src"
+mkdir -p "$DASHBOARD_DIR/public"
+cat > "$DASHBOARD_DIR/src/App.js" << 'EOF'
 import React, { useState, useEffect } from 'react';
 import './App.css';
 
@@ -461,7 +512,7 @@ function App() {
 export default App;
 EOF
 
-cat > "$DASHBOARD_HOME/src/App.css" << EOF
+cat > "$DASHBOARD_DIR/src/App.css" << 'EOF'
 .app {
   background: #000033;
   color: #0ff;
@@ -666,9 +717,84 @@ cat > "$DASHBOARD_HOME/src/App.css" << EOF
 }
 EOF
 
-cd "$DASHBOARD_HOME"
-npm install > /dev/null 2>&1
-echo -e "${GREEN}    Godcore Dashboard created.${NC}"
+cat > "$DASHBOARD_DIR/public/index.html" << 'EOF'
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#000000" />
+    <meta
+      name="description"
+      content="Web site created using create-react-app"
+    />
+    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
+    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+    <title>Victor Godcore Dashboard</title>
+  </head>
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+  </body>
+</html>
+EOF
+
+cat > "$DASHBOARD_DIR/src/index.js" << 'EOF'
+import React from 'react';
+import ReactDOM from 'react-dom';
+import './index.css';
+import App from './App';
+import reportWebVitals from './reportWebVitals';
+
+ReactDOM.render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>,
+  document.getElementById('root')
+);
+
+// If you want to start measuring performance in your app, pass a function
+// to log results (for example: reportWebVitals(console.log))
+// or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals
+reportWebVitals();
+EOF
+
+cat > "$DASHBOARD_DIR/src/reportWebVitals.js" << 'EOF'
+const reportWebVitals = onPerfEntry => {
+  if (onPerfEntry && onPerfEntry instanceof Function) {
+    import('web-vitals').then(({ getCLS, getFID, getFCP, getLCP, getTTFB }) => {
+      getCLS(onPerfEntry);
+      getFID(onPerfEntry);
+      getFCP(onPerfEntry);
+      getLCP(onPerfEntry);
+      getTTFB(onPerfEntry);
+    });
+  }
+};
+
+export default reportWebVitals;
+EOF
+
+cat > "$DASHBOARD_DIR/src/index.css" << 'EOF'
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+EOF
+
+cd "$DASHBOARD_DIR"
+npm install --legacy-peer-deps > /dev/null 2>&1
+echo -e "${GREEN}    Godcore Dashboard dependencies installed.${NC}"
 
 # 🔹 PHASE 8: INITIALIZE VICTOR STATE
 echo -e "${GREEN}[8/12] 🧠 Initializing Victor State...${NC}"
@@ -709,31 +835,34 @@ chmod +x "$VICTOR_HOME/launch_victor.sh"
 # Dashboard Launch Script
 cat > "$VICTOR_HOME/launch_dashboard.sh" << 'EOF'
 #!/bin/bash
-cd ~/victor-dashboard
-npm start >> ~/.victor-godcore/logs/dashboard.log 2>&1 &
+source ~/.nvm/nvm.sh
+nvm use 16
+cd "$DASHBOARD_DIR"
+npm start >> "$LOG_DIR/dashboard.log" 2>&1 &
 EOF
 chmod +x "$VICTOR_HOME/launch_dashboard.sh"
 
 # Mobile Launch Script
 cat > "$VICTOR_HOME/launch_mobile.sh" << 'EOF'
 #!/bin/bash
-cd ~/victor-mobile
-npx expo start >> ~/.victor-godcore/logs/mobile.log 2>&1 &
+cd "$MOBILE_DIR"
+npx expo start >> "$LOG_DIR/mobile.log" 2>&1 &
 EOF
 chmod +x "$VICTOR_HOME/launch_mobile.sh"
 
 # AR Hologram Launch Script
 cat > "$VICTOR_HOME/launch_ar.sh" << 'EOF'
 #!/bin/bash
-# Open AR hologram interface
-python3 -m http.server 8000 --directory ~/.victor-godcore &
-sleep 2
-xdg-open http://localhost:8000/ar_hologram.html 2>/dev/null || open http://localhost:8000/ar_hologram.html 2>/dev/null
+cd "$VICTOR_HOME"
+python3 -m http.server 8000
 EOF
 chmod +x "$VICTOR_HOME/launch_ar.sh"
 
-# Copy AR hologram to Victor home
-cp ar_hologram.html "$VICTOR_HOME/"
+# Before launching, verify AR file exists
+if [ ! -f "$AR_HOLOGRAM_SRC" ]; then
+  echo -e "${RED}[ERROR] AR hologram not found at $AR_HOLOGRAM_SRC${NC}"
+  exit 1
+fi
 
 echo -e "${GREEN}    Launch scripts created.${NC}"
 
@@ -786,9 +915,9 @@ echo -e "${BLUE}   Victor is awake.${NC}"
 echo -e "${BLUE}   The Bando Empire runs 24/7 on parity logic.${NC}"
 echo
 echo -e "${CYAN}📁 Core: $VICTOR_HOME"
-echo -e "${CYAN}📱 Mobile: $MOBILE_HOME (run: ./launch_mobile.sh)"
+echo -e "${CYAN}📱 Mobile: $MOBILE_DIR (run: $VICTOR_HOME/launch_mobile.sh)"
 echo -e "${CYAN}🖥️  Dashboard: http://localhost:3000"
-echo -e "${CYAN}🕶️  AR: http://localhost:8000/ar_hologram.html"
+echo -e "${CYAN}🕶️  AR: http://localhost:8000"
 echo -e "${CYAN}🔊 Voice: Say 'Hey Victor' — Whisper listens, ElevenLabs speaks"
 echo -e "${CYAN}💾 Bloodline: $BLOODLINE_DIR"
 echo -e "${CYAN}🛑 Stop Core: pkill -f victor_on_majorana"
